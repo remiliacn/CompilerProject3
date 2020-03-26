@@ -167,7 +167,7 @@ struct InstructionNode* parse_stmt(){
         case SWITCH:
             inst = parse_switch_stmt();
             endList = inst;
-            while(endList->next->next != NULL)
+            while(endList->next != NULL)
                 endList = endList->next;
 
             endList->next = emptyNode;
@@ -444,47 +444,6 @@ TokenType parse_relop(){
     return relop;
 }
 
-//switch_stmt → SWITCH ID LBRACE case_list RBRACE
-//switch_stmt → SWITCH ID LBRACE case_list default_case RBRACE
-struct InstructionNode * parse_switch_stmt(){
-    struct InstructionNode* switchStmt;
-    expect(SWITCH);
-
-    t = expect(ID);
-    int holder = inputMap[t.lexeme];
-    expect(LBRACE);
-
-    t = peek();
-    if(t.token_type != CASE){
-        syntax_error();
-    }
-
-    //check more cases
-    switchStmt = parse_case_list(holder);
-
-    t = peek();
-    //switch_stmt → SWITCH ID LBRACE case_list default_case RBRACE
-    if(t.token_type == DEFAULT){
-        auto endList = switchStmt;
-        while(endList->next->next != NULL){
-            endList = endList->next;
-        }
-        //default will always be the last element in a switch_case statement.
-        //because of the parsing grammar.
-        endList->next = parse_default_case();
-        expect(RBRACE);
-
-    } else if(t.token_type == RBRACE){
-        t = lexer.GetToken();
-        return switchStmt;
-
-    } else{
-        syntax_error();
-    }
-    
-    return switchStmt;
-}
-
 //for_stmt → FOR LPAREN assign_stmt condition SEMICOLON assign_stmt RPAREN body
 struct InstructionNode* parse_for_stmt(){
     struct InstructionNode* forStmt;
@@ -593,6 +552,47 @@ a, b, c;
 }
 1 2 3 4 5
 */
+
+//switch_stmt → SWITCH ID LBRACE case_list RBRACE
+//switch_stmt → SWITCH ID LBRACE case_list default_case RBRACE
+struct InstructionNode * parse_switch_stmt(){
+    struct InstructionNode* switchStmt;
+    expect(SWITCH);
+
+    t = expect(ID);
+    int holder = inputMap[t.lexeme];
+    expect(LBRACE);
+
+    t = peek();
+    if(t.token_type != CASE){
+        syntax_error();
+    }
+
+    //check more cases
+    switchStmt = parse_case_list(holder);
+
+    t = peek();
+    //switch_stmt → SWITCH ID LBRACE case_list default_case RBRACE
+    if(t.token_type == DEFAULT){
+        auto endList = switchStmt;
+        while(endList->next->next != NULL){
+            endList = endList->next;
+        }
+        //default will always be the last element in a switch_case statement.
+        //because of the parsing grammar.
+        endList->next = parse_default_case();
+        expect(RBRACE);
+
+    } else if(t.token_type == RBRACE){
+        t = lexer.GetToken();
+        return switchStmt;
+
+    } else{
+        syntax_error();
+    }
+
+    return switchStmt;
+}
 
 struct InstructionNode* parse_case_list(int holder){
     struct InstructionNode* caseNode;

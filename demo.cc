@@ -12,7 +12,6 @@ Token t;
 struct InstructionNode* emptyNode = new InstructionNode;
 map<string, int> inputMap; 
 struct InstructionNode* body;
-int holder = INT_MIN;
 void parse_program();
 void parse_var_section();
 void parse_id_list();
@@ -30,8 +29,8 @@ InstructionNode * parse_condition();
 TokenType parse_relop();
 InstructionNode * parse_switch_stmt();
 InstructionNode * parse_for_stmt();
-InstructionNode * parse_case_list();
-InstructionNode * parse_case();
+InstructionNode * parse_case_list(int holder);
+InstructionNode * parse_case(int holder);
 InstructionNode * parse_default_case();
 void parse_inputs();
 void parse_num_list();
@@ -116,8 +115,8 @@ struct InstructionNode* parse_body(){
 }
 
 struct InstructionNode* parse_stmt_list(){
-    struct InstructionNode* inst1 = NULL; 
-    struct InstructionNode* inst2 = NULL;
+    struct InstructionNode* inst1;
+    struct InstructionNode* inst2;
     inst1 = parse_stmt();
 
     auto endList = inst1;
@@ -168,7 +167,7 @@ struct InstructionNode* parse_stmt(){
         case SWITCH:
             inst = parse_switch_stmt();
             endList = inst;
-            while(endList->next != NULL)
+            while(endList->next->next != NULL)
                 endList = endList->next;
 
             endList->next = emptyNode;
@@ -452,7 +451,7 @@ struct InstructionNode * parse_switch_stmt(){
     expect(SWITCH);
 
     t = expect(ID);
-    holder = inputMap[t.lexeme];
+    int holder = inputMap[t.lexeme];
     expect(LBRACE);
 
     t = peek();
@@ -461,7 +460,7 @@ struct InstructionNode * parse_switch_stmt(){
     }
 
     //check more cases
-    switchStmt = parse_case_list();
+    switchStmt = parse_case_list(holder);
 
     t = peek();
     //switch_stmt → SWITCH ID LBRACE case_list default_case RBRACE
@@ -595,7 +594,7 @@ a, b, c;
 1 2 3 4 5
 */
 
-struct InstructionNode* parse_case_list(){
+struct InstructionNode* parse_case_list(int holder){
     struct InstructionNode* caseNode;
     struct InstructionNode* caseList = NULL;
 
@@ -604,7 +603,7 @@ struct InstructionNode* parse_case_list(){
         syntax_error();
     }
 
-    caseNode = parse_case();
+    caseNode = parse_case(holder);
 
     //switch case should have two JMP at the end
     //One is for escaping the case, and one is for escaping whatever the other body is.
@@ -623,7 +622,7 @@ struct InstructionNode* parse_case_list(){
 
     t = peek();
     if(t.token_type == CASE){
-        caseList = parse_case_list();
+        caseList = parse_case_list(holder);
 
         auto endList = caseNode;
         while(endList->next->next != NULL){
@@ -636,7 +635,7 @@ struct InstructionNode* parse_case_list(){
     return caseNode;
 }
 
-struct InstructionNode* parse_case(){
+struct InstructionNode* parse_case(int holder){
     auto* castStmt = new InstructionNode;
     expect(CASE);
     

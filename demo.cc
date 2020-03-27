@@ -9,9 +9,11 @@ using namespace std;
 LexicalAnalyzer lexer;
 Token t;
 
-struct InstructionNode* emptyNode = new InstructionNode;
-map<string, int> inputMap; 
+//Map for storing user input by variable name
+map<string, int> inputMap;
+//Global program body.
 struct InstructionNode* body;
+//Parser methods
 void parse_program();
 void parse_var_section();
 void parse_id_list();
@@ -27,9 +29,9 @@ InstructionNode * parse_while_stmt();
 InstructionNode * parse_if_stmt();
 InstructionNode * parse_condition();
 TokenType parse_relop();
-InstructionNode * parse_switch_stmt();
+InstructionNode * parse_switch_stmt(InstructionNode* emptyNode);
 InstructionNode * parse_for_stmt();
-InstructionNode * parse_case_list(int holder);
+InstructionNode * parse_case_list(int holder, InstructionNode* emptyNode);
 InstructionNode * parse_case(int holder);
 InstructionNode * parse_default_case();
 void parse_inputs();
@@ -55,12 +57,6 @@ Token expect(TokenType expected_type){
 
 struct InstructionNode * parse_generate_intermediate_representation()
 {
-    //init an emptyNode for switch case to use.
-
-    //work flow:
-    //switch -> case -> case -> ... -> case body -> emptyNode -> endSwitch
-    emptyNode->type = NOOP;
-    emptyNode->next = NULL;
     parse_program();
     return body;
 }
@@ -132,6 +128,7 @@ struct InstructionNode* parse_stmt_list(){
         case FOR:
         case OUTPUT:
         case INPUT:
+            //Put other statements at the end of the previous statement.
             inst2 = parse_stmt_list();
             while(endList->next != NULL){
                 endList = endList->next;
@@ -149,6 +146,7 @@ struct InstructionNode* parse_stmt_list(){
 struct InstructionNode* parse_stmt(){
     struct InstructionNode* inst = NULL;
     struct InstructionNode* endList;
+    auto* emptyNode = new InstructionNode;
 
     t = peek();
     switch(t.token_type){
@@ -165,7 +163,11 @@ struct InstructionNode* parse_stmt(){
             break;
 
         case SWITCH:
-            inst = parse_switch_stmt();
+            //the escaping emptyNode for THIS scope of switch statement
+            emptyNode->type = NOOP;
+            emptyNode->next = NULL;
+            //Transfer the outer statement block empty node to the switch statement for JMP
+            inst = parse_switch_stmt(emptyNode);
             endList = inst;
             while(endList->next != NULL)
                 endList = endList->next;
@@ -555,7 +557,7 @@ a, b, c;
 
 //switch_stmt → SWITCH ID LBRACE case_list RBRACE
 //switch_stmt → SWITCH ID LBRACE case_list default_case RBRACE
-struct InstructionNode * parse_switch_stmt(){
+struct InstructionNode * parse_switch_stmt(InstructionNode* emptyNode){
     struct InstructionNode* switchStmt;
     expect(SWITCH);
 
@@ -569,7 +571,7 @@ struct InstructionNode * parse_switch_stmt(){
     }
 
     //check more cases
-    switchStmt = parse_case_list(holder);
+    switchStmt = parse_case_list(holder, emptyNode);
 
     t = peek();
     //switch_stmt → SWITCH ID LBRACE case_list default_case RBRACE
@@ -594,7 +596,7 @@ struct InstructionNode * parse_switch_stmt(){
     return switchStmt;
 }
 
-struct InstructionNode* parse_case_list(int holder){
+struct InstructionNode* parse_case_list(int holder, InstructionNode* emptyNode){
     struct InstructionNode* caseNode;
     struct InstructionNode* caseList = NULL;
 
@@ -611,6 +613,8 @@ struct InstructionNode* parse_case_list(int holder){
     jmp->type = JMP;
 
     //Escaping the case statement
+    //Cannot use global emptyNode apparently.
+    //Every single statement's escaping node should be defined in scope.
     jmp->jmp_inst.target = emptyNode;
 
     struct InstructionNode* endList = caseNode->cjmp_inst.target;
@@ -622,7 +626,7 @@ struct InstructionNode* parse_case_list(int holder){
 
     t = peek();
     if(t.token_type == CASE){
-        caseList = parse_case_list(holder);
+        caseList = parse_case_list(holder, emptyNode);
 
         auto endList = caseNode;
         while(endList->next->next != NULL){
